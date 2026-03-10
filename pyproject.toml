@@ -1,0 +1,14 @@
+[project]
+name = "claude-street"
+version = "0.1.0"
+description = "Sarhaan's mini hedge fund, staffed by Claude Code"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "httpx>=0.28.1",
+    "python-dotenv>=1.2.2",
+    "rich>=14.3.3",
+    "ruff>=0.15.5",
+    "typer>=0.24.1",
+    "websockets>=16.0",
+]

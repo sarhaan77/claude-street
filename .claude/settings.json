@@ -1,0 +1,48 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(uv *)",
+      "Bash(uvx *)",
+      "Bash(ls *)",
+      "Bash(mkdir *)",
+      "Bash(cat *)",
+      "Bash(which *)",
+      "Bash(grep:*)",
+      "Bash(wc:*)",
+      "Bash(find:*)",
+      "Bash(* --version)",
+      "Bash(* --help)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git status)",
+      "Bash(git diff *)",
+      "Bash(git log *)",
+      "Bash(git status *)",
+      "Read",
+      "Bash(uv add:*)",
+      "Bash(uv run:*)",
+      "WebSearch",
+      "WebFetch"
+    ],
+    "deny": [
+      "Bash(rm -rf *)",
+      "Bash(git push *)",
+      "Bash(git reset --hard *)",
+      "Bash(pip *)",
+      "Bash(python3:*)"
+    ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "jq -r '.tool_input.file_path' | grep -E '\\.py$' | xargs -I{} sh -c 'ruff format {} && ruff check {}' || true"
+          }
+        ]
+      }
+    ]
+  }
+}
