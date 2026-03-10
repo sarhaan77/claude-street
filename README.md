@@ -10,6 +10,8 @@ This repo contains a Python cli that wraps the Schwab API, and lets me investiga
 
 imo, Claude Code is the perfect form factor for this because it can search the web, research & pull in live data for all relevant instruments, write code to analyze/explain it, and then place the trade when you're ready!
 
+![Claude Street](./assets/example.jpg)
+
 ## Setup
 
 Requires Python 3.13+ and [uv](https://docs.astral.sh/uv/). You'll also need a free [Schwab Developer Portal](https://developer.schwab.com/) account.
