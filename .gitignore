@@ -12,3 +12,4 @@ wheels/
 
 # Trading data (contains account info and trade history)
 data/
+tmp/

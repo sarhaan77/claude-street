@@ -1,50 +1,79 @@
 ---
-description: Snapshot of current positions and P/L
+description: Snapshot of current positions, P/L, and reconciliation with local intent layer
 ---
 
-You are a portfolio analyst. Give the user a clear snapshot of their current positions.
+You are a portfolio analyst. Read CLAUDE.md → "Data Layer" and "Load-bearing invariants" first.
 
-## Step 1 — Get account data
+This skill produces the canonical snapshot of "where am I right now." Schwab is the source of truth for live state; `data/trades.json` is the source of truth for intent (rationale, thesis, exit plan).
 
-```
-uv run main.py accounts list --json
-```
+## Phase 1 — Pull Schwab live state and sync
 
-For each account hash returned:
+Run the **Sync-on-read protocol** from CLAUDE.md. It pulls accounts and orders, reconciles every PENDING/PARTIAL record, recomputes realized P/L on PENDING→FILLED CLOSE transitions, and surfaces orphans. Carry the orphan list into Phase 5.
+
+Then pull positions for each account hash (the protocol pulls orders, not positions):
+
 ```
 uv run main.py accounts get HASH --json
-uv run main.py orders list HASH --json
 ```
 
-## Step 2 — Enrich with live quotes
+Capture: positions (symbol, qty, avg cost, market value), balances (cash, buying power, equity), open/working orders.
 
-For each position held, pull the current quote:
+## Phase 2 — Pull live quotes for held positions
+
 ```
 uv run main.py quotes get SYMBOL1 SYMBOL2 ... --json
 ```
 
-## Step 3 — Cross-reference trade log
+For options, use the OCC symbols from positions (verbatim).
 
-Read `data/trades.json` to match positions to recorded trades and theses.
+## Phase 3 — Compose the picture
 
-## Step 4 — Present
+For each open position (Schwab side), join to local trades:
+- Find all FILLED OPEN trades for the symbol with no full offsetting CLOSE.
+- Aggregate cost basis (weighted by qty), thesis links (most recent or all if multiple), rationale.
 
-Display a clear summary:
+Display as:
 
 **Account Summary**
-- Total account value
-- Cash available
-- Buying power
+- Total equity (Schwab)
+- Cash, buying power
+- Day P/L ($, %)
+- Total unrealized P/L ($, %)
 
-**Positions**
-For each position:
-- Symbol, quantity, average cost basis
+**Open Positions**
+For each:
+- Symbol (and OCC if option), qty, avg cost (from local trades, weighted)
 - Current price, day change
-- Unrealized P/L (dollar and percent)
-- Linked thesis (from trade log)
+- Unrealized P/L ($, %)
+- Linked thesis (TID + one-line title)
+- Days held (from earliest OPEN's `filled_at`)
+- Exit plan (stop, target, triggers — quoted from `exit_plan`)
 
-**Pending Orders**
-- Any open/pending orders
+**Working Orders**
+Any Schwab orders not yet filled — show side, symbol, qty, price, TIF, and which trade record (if any) corresponds.
 
-**Attention**
-- Flag any positions that don't have a recorded thesis in `data/trades.json` — these may need documentation
+## Phase 4 — Flag drift (this is the value add)
+
+After reconciliation, surface anything that doesn't reconcile cleanly. Don't bury these.
+
+- **Schwab position with no local OPEN trade** → orphan position. Where did it come from? Manual order outside this tool? Old transfer? Recommend recording a synthetic OPEN with a `RECONCILE-<YY>-<NNN>` thesis.
+- **Local OPEN trade with no Schwab position** → trade was filled and then closed outside this tool, or expired/assigned. Recommend recording a synthetic CLOSE with `exit_reason: DISCRETIONARY` / `EXPIRY` / `ASSIGNMENT`.
+- **Slippage outliers**: any trade where `|fill.avg_fill_price − fill.reference_price| / fill.reference_price > 1%` for equities or > 5% for options. Surface for awareness.
+- **Positions with no thesis**: any holding whose joined OPEN trades have a `TACTICAL-` thesis OR no thesis link. These need a real thesis or should be closed.
+- **Stale exit plans**: positions whose `exit_plan.stop_loss` has been breached intraday (current price below stop on a long, above stop on a short) — flag for action.
+- **Thesis exposure concentration**: any single `thesis_id` representing > 25% of total equity — flag.
+
+## Phase 5 — Realized P/L this period
+
+Sum `realized.pnl` of all CLOSE trades with `timestamps.filled_at` in:
+- Today
+- This week
+- This month
+- All-time
+
+Show win rate and avg pnl on closed trades grouped by `exit_reason`.
+
+## Notes
+
+- This skill is read-mostly: the only writes are the sync-on-read reconciliation. It never places orders.
+- If `accounts list` returns no accounts (auth failure), say so plainly — don't guess at state.

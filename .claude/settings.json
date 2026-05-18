@@ -22,7 +22,8 @@
       "Bash(uv add:*)",
       "Bash(uv run:*)",
       "WebSearch",
-      "WebFetch"
+      "WebFetch",
+      "Bash(parallel-cli *)"
     ],
     "deny": [
       "Bash(rm -rf *)",
